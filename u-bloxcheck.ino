@@ -25,7 +25,7 @@ SYSTEM_MODE(SEMI_AUTOMATIC); //We handle modem power and connection
 
 int AT_cmd;
 
-#define NATCOMMANDS 23
+#define NATCOMMANDS 24
 char AT_commands[NATCOMMANDS][32] = {
     "AT+CCID\r\n",//0
     "AT+UMNOPROF?\r\n",//1
@@ -49,7 +49,8 @@ char AT_commands[NATCOMMANDS][32] = {
     "AT+UDOPN=2\r\n",//19
     "ATI0\r\n",//20
     "ATI7\r\n",//21
-    "ATI9\r\n"//22
+    "ATI9\r\n",//22
+    "AT+UGPIOR=23\r\n"//23
 };
 
 //****************
@@ -73,7 +74,7 @@ String sSq;
 String sCell;
 String sStrength;
 String sQuality;
-
+String sSim;
 
 unsigned long int last_read;
 
@@ -137,6 +138,7 @@ void setup()
     Particle.variable("MODEL",  &sModel,    STRING);
     Particle.variable("HWREV",  &sHw,       STRING);
     Particle.variable("FWREV",  &sFw,       STRING);
+    Particle.variable("SIM",    &sSim,      STRING);
 
     Particle.variable("MClock", &sClk,      STRING);
     Particle.variable("Service",&sCell,     STRING);
@@ -238,6 +240,8 @@ int callbackAT(int type, const char* buf, int len, char* rets)
     const char s[2] = ",";
     char sret[2048];
     char *token;
+    unsigned long int bmask,mask;
+    int i;
     
     //**********
     //Debug info
@@ -281,6 +285,24 @@ int callbackAT(int type, const char* buf, int len, char* rets)
                 token = strtok(rets, s);
                 token = strtok(NULL, s);
                 sBandmask = token;
+                sscanf(sBandmask.c_str(), "%d", &bmask);
+                sBandmask = "";
+                i = 1;
+                mask = 1;
+                while(i<33)
+                {
+                    if (bmask & mask)
+                    {
+                        if (sBandmask != "")
+                        {
+                            sBandmask += ",";
+                        }
+                        sprintf(rets,"%d",i);
+                        sBandmask += rets;
+                    }
+                    mask <<= 1;
+                    i++;
+                }
                 break;
             case 8:
                 sscanf(buf, "\r\n+CGDCONT: 1,%[^\r]\r\n", rets);
@@ -337,6 +359,20 @@ int callbackAT(int type, const char* buf, int len, char* rets)
             case 22:
                 sscanf(buf, "\r\n %[^\r]\r\n", rets);
                 sFw = rets;
+                break;
+            case 23:
+                sscanf(buf, "\r\n+UGPIOR: %[^\r]\r\n", rets);
+                token = strtok(rets, s);
+                token = strtok(NULL, s);
+                sSim = token;
+                if (sSim == "1")
+                {
+                    sSim = "Internal";
+                }
+                else
+                {
+                    sSim = "External";
+                }
                 break;
         }
     }
